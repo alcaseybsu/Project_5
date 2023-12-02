@@ -1,20 +1,19 @@
 package file_service;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class FileServer {
 
-  private static final int STATUS_CODE_LENGTH = 1;
-  private static final String RELATIVE_PATH = "TestFiles/";
   private static final String BASE_PATH =
-    System.getProperty("user.home") + "\\git_repo\\Project_5\\" + RELATIVE_PATH;
+    System.getProperty("user.dir") + "\\TestFiles\\";
 
   public static void main(String[] args) throws Exception {
     int port = 3000;
@@ -27,96 +26,91 @@ public class FileServer {
       do {
         numBytes = serveChannel.read(request);
       } while (numBytes >= 0);
-
       //while(serveChannel.read(request) >= 0);
-
       //new
       request.flip();
       char command = (char) request.get();
       System.out.println("received command: " + command);
       switch (command) {
-        ///////////////////////////////////////////////////////////////F
+        // delete a file from the server
         case 'D':
           {
-            byte[] a = new byte[request.remaining()];
-            request.get(a);
-            String fileName = new String(a);
+            byte[] d = new byte[request.remaining()];
+            request.get(d);
+            String fileToDelete = new String(d);
+            System.out.println("file to delete: " + fileToDelete);
 
-            // Print statement added
-            System.out.println("Server: Deleting file '" + fileName + "'...");
+            // Construct the absolute path to the file
+            String filePath = BASE_PATH + fileToDelete;
 
-            String filePath = BASE_PATH + fileName;
             File file = new File(filePath);
             boolean success = false;
 
+            // check if file exists before attempting to delete
             if (file.exists()) {
-              success = file.delete();
+              // Check if the file is empty
+              if (file.length() == 0) {
+                success = file.delete();
+              } else {
+                // File is not empty, but still considered a success if deleted
+                success = file.delete();
+              }
             }
 
             if (success) {
-              System.out.println(
-                "Server: File '" + fileName + "' deleted successfully."
-              );
-              ByteBuffer code = ByteBuffer.wrap("S".getBytes());
-              serveChannel.write(code);
+              ByteBuffer dCode = ByteBuffer.wrap("S".getBytes());
+              serveChannel.write(dCode);
             } else {
-              System.out.println(
-                "Server: File '" +
-                fileName +
-                "' does not exist or couldn't be deleted."
-              );
-              ByteBuffer code = ByteBuffer.wrap("F".getBytes());
-              serveChannel.write(code);
+              ByteBuffer dCode = ByteBuffer.wrap("F".getBytes());
+              serveChannel.write(dCode);
             }
+
             serveChannel.close();
             break;
           }
-        ///////////////////////////////////////////////////////////////
         case 'L':
-          {
-            File serverDirectory = new File(BASE_PATH);
-            File[] files = serverDirectory.listFiles();
+          String basePath =
+            System.getProperty("user.dir") + File.separator + "TestFiles";
+          File directory = new File(basePath);
 
-            ByteBuffer response = ByteBuffer.allocate(2500);
+          File[] files = directory.listFiles();
 
-            if (files != null && files.length > 0) {
-              response.put((byte) 'S'); // Success
-              for (File singleFile : files) {
-                byte[] fileNameBytes = singleFile
-                  .getName()
-                  .getBytes(StandardCharsets.UTF_8);
-                response.putInt(fileNameBytes.length);
-                response.put(fileNameBytes);
-              }
-            } else {
-              response.put((byte) 'F'); // Failure
+          if (files != null) {
+            StringBuilder fileList = new StringBuilder();
+            for (File fileInDirectory : files) {
+              fileList.append(fileInDirectory.getName()).append("\n");
             }
 
-            response.flip();
-            serveChannel.write(response);
-            serveChannel.close();
-            break;
+            ByteBuffer fileListBuffer = ByteBuffer.wrap(
+              fileList.toString().getBytes()
+            );
+            serveChannel.write(fileListBuffer);
+          } else {
+            ByteBuffer listCode = ByteBuffer.wrap("F".getBytes());
+            serveChannel.write(listCode);
           }
-        ///////////////////////////////////////////////////////////////
+
+          serveChannel.close();
+          break;
         case 'R':
           {
-            int currentFileNameLength = request.getInt();
-            byte[] currentFileNameBytes = new byte[currentFileNameLength];
+            // Extract current file name
+            byte[] currentFileNameBytes = new byte[request.getInt()];
             request.get(currentFileNameBytes);
             String currentFileName = new String(
               currentFileNameBytes,
               StandardCharsets.UTF_8
             );
 
-            int newFileNameLength = request.getInt();
-            byte[] newFileNameBytes = new byte[newFileNameLength];
+            // Extract new file name
+            byte[] newFileNameBytes = new byte[request.getInt()];
             request.get(newFileNameBytes);
             String newFileName = new String(
               newFileNameBytes,
               StandardCharsets.UTF_8
             );
 
-            // Print statement added
+            // Print added for debugging
             System.out.println(
               "Server: Renaming file '" +
               currentFileName +
@@ -125,95 +119,97 @@ public class FileServer {
               "'..."
             );
 
-            File currentFile = new File(BASE_PATH + currentFileName);
-            File newFile = new File(BASE_PATH + newFileName);
+            // Construct the absolute path to the current file
+            String currentFilePath = BASE_PATH + currentFileName;
 
-            ByteBuffer response = ByteBuffer.allocate(STATUS_CODE_LENGTH);
+            // Construct the absolute path to the new file
+            String newFilePath = BASE_PATH + newFileName;
 
-            if (
-              currentFile.exists() &&
-              !newFile.exists() &&
-              currentFile.renameTo(newFile)
-            ) {
-              response.put((byte) 'S'); // Success
-            } else {
-              response.put((byte) 'F'); // Failure
-            }
+            File currentFile = new File(currentFilePath);
 
-            response.flip();
-            serveChannel.write(response);
-            serveChannel.close();
-            break;
-          }
-        ///////////////////////////////////////////////////////////////
-        case 'G':
-          {
-            byte[] fileNameBytes = new byte[request.get()];
-            request.get(fileNameBytes);
-            String requestedFileName = new String(
-              fileNameBytes,
-              StandardCharsets.UTF_8
-            );
-            File serverFile = new File("ServerFiles/" + requestedFileName);
-
-            ByteBuffer responseCode = ByteBuffer.allocate(STATUS_CODE_LENGTH);
-            ByteBuffer fileContent = ByteBuffer.allocate(2500);
-
-            if (serverFile.exists()) {
-              responseCode.put((byte) 'S'); // Success
-              responseCode.flip();
-              serveChannel.write(responseCode);
-
-              // Send the file content to the client
-              try (FileInputStream fis = new FileInputStream(serverFile)) {
-                byte[] buffer = new byte[1024];
-                int bytesRead;
-                while ((bytesRead = fis.read(buffer)) > 0) {
-                  fileContent.put(buffer, 0, bytesRead);
-                  fileContent.flip();
-                  serveChannel.write(fileContent);
-                  fileContent.clear();
-                }
+            if (currentFile.exists()) {
+              // Rename the file
+              File newFile = new File(newFilePath);
+              if (currentFile.renameTo(newFile)) {
+                ByteBuffer renameCode = ByteBuffer.wrap("S".getBytes());
+                serveChannel.write(renameCode);
+              } else {
+                ByteBuffer renameCode = ByteBuffer.wrap("F".getBytes());
+                serveChannel.write(renameCode);
               }
             } else {
-              responseCode.put((byte) 'F'); // Failure
-              responseCode.flip();
-              serveChannel.write(responseCode);
+              // File to rename not found
+              ByteBuffer renameCode = ByteBuffer.wrap("F".getBytes());
+              serveChannel.write(renameCode);
             }
 
             serveChannel.close();
             break;
           }
-        ///////////////////////////////////////////////////////////////
+        // download a file from the server
+        case 'G':
+          {
+            byte[] g = new byte[request.remaining()];
+            request.get(g);
+            String fileToDownload = new String(g);
+            System.out.println("file to download: " + fileToDownload);
+
+            // Construct the absolute path to the file on the server
+            String filePath = BASE_PATH + fileToDownload;
+
+            File file = new File(filePath);
+
+            if (file.exists()) {
+              if (file.length() == 0) {
+                // File is empty, send an 'F' code
+                ByteBuffer gCode = ByteBuffer.wrap("F".getBytes());
+                serveChannel.write(gCode);
+              } else {
+                // Send the file content to the client
+                byte[] fileBytes = Files.readAllBytes(file.toPath());
+                ByteBuffer fileContent = ByteBuffer.wrap(fileBytes);
+                serveChannel.write(fileContent);
+              }
+            } else {
+              // Notify the client that the file is not found
+              ByteBuffer gCode = ByteBuffer.wrap("F".getBytes());
+              serveChannel.write(gCode);
+            }
+
+            serveChannel.close();
+            break;
+          }
+        // Existing code...
+
         case 'U':
           {
-            byte[] fileNameBytes = new byte[request.remaining()];
-            request.get(fileNameBytes);
-            String uploadedFileName = new String(fileNameBytes);
+            // Extract file path
+            byte[] filePathBytes = new byte[request.getInt()];
+            request.get(filePathBytes);
+            String filePath = new String(filePathBytes, StandardCharsets.UTF_8);
 
-            // Read the file content
-            ByteBuffer fileContentBuffer = ByteBuffer.allocate(2500);
-            serveChannel.read(fileContentBuffer);
-            fileContentBuffer.flip();
-            byte[] fileContent = new byte[fileContentBuffer.remaining()];
-            fileContentBuffer.get(fileContent);
+            // Read file content
+            byte[] fileContent = new byte[request.remaining()];
+            request.get(fileContent);
 
-            // Save the file on the server
-            try (
-              FileOutputStream fos = new FileOutputStream(
-                "ServerFiles/" + uploadedFileName
-              )
-            ) {
-              fos.write(fileContent);
+            // Construct the absolute path to save the file on the server
+            String savePath = BASE_PATH + filePath;
+
+            try {
+              Files.write(Paths.get(savePath), fileContent);
+
+              // Send success code to the client
+              ByteBuffer uploadCode = ByteBuffer.wrap("S".getBytes());
+              serveChannel.write(uploadCode);
+            } catch (IOException e) {
+              // Send failure code to the client
+              ByteBuffer uploadCode = ByteBuffer.wrap("F".getBytes());
+              serveChannel.write(uploadCode);
             }
 
-            // Send success response to the client
-            ByteBuffer code = ByteBuffer.wrap("S".getBytes());
-            serveChannel.write(code);
             serveChannel.close();
             break;
           }
-        ///////////////////////////////////////////////////////////////
       }
     }
   }
