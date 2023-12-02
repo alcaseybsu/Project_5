@@ -1,0 +1,5 @@
+{
+"editor.defaultFormatter": "Red Hat",
+"java.format.settings.url": "https://github.com/redhat-developer/vscode-java/raw/master/server/settings.json",
+"editor.formatOnSave": true
+}
