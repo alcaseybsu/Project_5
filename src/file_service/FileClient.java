@@ -1,9 +1,6 @@
 package file_service;
 
-import java.io.BufferedReader;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -17,264 +14,232 @@ public class FileClient {
   private static final int STATUS_CODE_LENGTH = 1;
 
   public static void main(String[] args) throws Exception {
+    Scanner keyboard = new Scanner(System.in);
+
     if (args.length != 2) {
       System.out.println("Syntax: FileClient <ServerIP> <ServerPort>");
-      return;
     }
     int serverPort = Integer.parseInt(args[1]);
-    String command = "";
-
-    try (
-      BufferedReader reader = new BufferedReader(
-        new InputStreamReader(System.in)
-      )
-    ) {
-      do {
-        System.out.println("Please type a command:");
-        command = reader.readLine().toUpperCase();
-        switch (command) {
-          ///////////////////////////////////////////////////////////////////
-          case "D":
+    String command;
+    do {
+      System.out.println("Please type a command:");
+      command = keyboard.nextLine().toUpperCase();
+      switch (command) {
+        case "D":
+          {
             System.out.println("Please enter file name");
-            Scanner keyboard = new Scanner(System.in);
-            String fileName = keyboard.nextLine();
-
-            // Print statement added
-            System.out.println("Client: Deleting file '" + fileName + "'...");
-
-            ByteBuffer request = ByteBuffer.wrap(
-              (command + fileName).getBytes()
+            String fileToDelete = keyboard.nextLine();
+            ByteBuffer deleteRequest = ByteBuffer.wrap(
+              (command + fileToDelete).getBytes()
             );
-
             SocketChannel channel = SocketChannel.open();
             channel.connect(new InetSocketAddress(args[0], serverPort));
-            channel.write(request);
+            channel.write(deleteRequest);
             channel.shutdownOutput();
-
-            ByteBuffer code = ByteBuffer.allocate(STATUS_CODE_LENGTH);
-            channel.read(code);
+            ByteBuffer dCode = ByteBuffer.allocate(STATUS_CODE_LENGTH);
+            channel.read(dCode);
+            //new
             channel.close();
-            code.flip();
-            byte[] a = new byte[STATUS_CODE_LENGTH];
-            code.get(a);
-
-            // Print the success or failure message
-            if ("S".equals(new String(a))) {
-              System.out.println(
-                "Client: File '" + fileName + "' deleted successfully."
-              );
-            } else {
-              System.out.println(
-                "Client: File '" +
-                fileName +
-                "' does not exist or couldn't be deleted."
-              );
-            }
-
-            keyboard.close();
+            dCode.flip();
+            byte[] d = new byte[STATUS_CODE_LENGTH];
+            dCode.get(d);
+            System.out.println(new String(d));
             break;
-          /////////////////////////////////////////////////////////////////////////
-          case "U":
-            {
-              System.out.println("Please enter file name to upload");
-              keyboard = new Scanner(System.in);
-              fileName = reader.readLine();
+          }
+        case "U":
+          {
+            System.out.println(
+              "Please enter the file name to upload (located in 'caseUFiles' dir):"
+            );
+            String fileName = keyboard.nextLine();
+            String filePath = "caseUFiles/" + fileName;
 
-              // Read the file content
-              System.out.println("Please enter the path of the file to upload");
-              String filePath = reader.readLine();
+            try {
               byte[] fileContent = Files.readAllBytes(Paths.get(filePath));
 
-              // Inform the user about the upload in progress
-              System.out.println(
-                "Uploading '" + fileName + "'... Please wait."
+              // Prepare the request buffer with command and file content
+              ByteBuffer uploadRequest = ByteBuffer.allocate(
+                Integer.BYTES +
+                command.length() +
+                Integer.BYTES +
+                filePath.length() +
+                fileContent.length
               );
 
-              // create a ByteBuffer for the request (command + fileName + fileContent)
-              request =
-                ByteBuffer.allocate(1 + fileName.length() + fileContent.length);
-              request.put(command.getBytes(StandardCharsets.UTF_8));
-              request.put(fileName.getBytes(StandardCharsets.UTF_8));
-              request.put(fileContent);
+              uploadRequest.put(command.getBytes());
+              uploadRequest.putInt(filePath.length());
+              uploadRequest.put(filePath.getBytes());
+              uploadRequest.put(fileContent);
 
-              channel = SocketChannel.open();
-              channel.connect(new InetSocketAddress(args[0], serverPort));
-              channel.write(request);
-              channel.shutdownOutput();
+              // Flip the buffer before writing to the channel
+              uploadRequest.flip();
 
-              code = ByteBuffer.allocate(STATUS_CODE_LENGTH);
-              channel.read(code);
-              channel.close();
-              code.flip();
-              byte[] responseCode = new byte[STATUS_CODE_LENGTH];
-              code.get(responseCode);
+              try (SocketChannel channel = SocketChannel.open()) {
+                channel.connect(new InetSocketAddress(args[0], serverPort));
+                channel.write(uploadRequest);
+                channel.shutdownOutput();
 
-              // Print the success or failure message
-              if ("S".equals(new String(responseCode))) {
-                System.out.println(
-                  "File '" + fileName + "' uploaded successfully."
-                );
-              } else {
-                System.out.println(
-                  "Failed to upload the file. Check if the file exists and the path is valid."
-                );
-              }
-              keyboard.close();
-              break;
-            }
-          ///////////////////////////////////////////////////////////////////
-          case "G":
-            {
-              System.out.println("Please enter the file name to download:");
-              fileName = reader.readLine();
+                ByteBuffer uploadCode = ByteBuffer.allocate(STATUS_CODE_LENGTH);
+                channel.read(uploadCode);
+                channel.close();
+                uploadCode.flip();
 
-              // Inform the user about the download in progress
-              System.out.println(
-                "Downloading '" + fileName + "'... Please wait."
-              );
+                byte[] responseCode = new byte[STATUS_CODE_LENGTH];
+                uploadCode.get(responseCode);
 
-              request = ByteBuffer.wrap((command + fileName).getBytes());
-              channel = SocketChannel.open();
-              channel.connect(new InetSocketAddress(args[0], serverPort));
-              channel.write(request);
-              channel.shutdownOutput();
-
-              ByteBuffer responseCode = ByteBuffer.allocate(STATUS_CODE_LENGTH);
-              channel.read(responseCode);
-
-              if ("S".equals(new String(responseCode.array()))) {
-                ByteBuffer fileContent = ByteBuffer.allocate(2500);
-                int bytesRead;
-                while ((bytesRead = channel.read(fileContent)) > 0) {
-                  fileContent.flip();
-                  byte[] data = new byte[bytesRead];
-                  fileContent.get(data);
-                  // Save the file content to a file on the client side
-                  try (
-                    FileOutputStream fos = new FileOutputStream(
-                      "DownloadedFiles/" + fileName
-                    )
-                  ) {
-                    fos.write(data);
-                  }
-                  fileContent.clear();
+                if ("S".equals(new String(responseCode))) {
+                  System.out.println("S");
+                } else {
+                  System.out.println("F");
                 }
-                System.out.println(
-                  "File '" + fileName + "' downloaded successfully."
-                );
+              }
+            } catch (IOException e) {
+              System.out.println("Error reading the file: " + e.getMessage());
+            }
+
+            break;
+          }
+        // download a file
+        case "G":
+          {
+            System.out.println("Please enter the file name:");
+            String fileToDownload = keyboard.nextLine().trim();
+
+            // Debugging output
+            System.out.println(
+              "Client: File name after trimming: '" + fileToDownload + "'"
+            );
+
+            // Specify the download location on the client side (user's desktop)
+            String userDesktop =
+              System.getProperty("user.home") + "\\Desktop\\";
+            String downloadPath = userDesktop + fileToDownload;
+
+            ByteBuffer downloadRequest = ByteBuffer.wrap(
+              (command + fileToDownload).getBytes()
+            );
+            try (SocketChannel downloadChannel = SocketChannel.open()) {
+              downloadChannel.connect(
+                new InetSocketAddress(args[0], serverPort)
+              );
+              downloadChannel.write(downloadRequest);
+              downloadChannel.shutdownOutput();
+
+              ByteBuffer fileContent = ByteBuffer.allocate(2500); // Adjust the buffer size as needed
+              int numBytes;
+              do {
+                numBytes = downloadChannel.read(fileContent);
+              } while (numBytes >= 0);
+
+              fileContent.flip();
+
+              // Check if the file exists on the server
+              byte[] checkFile = new byte[1];
+              fileContent.get(checkFile);
+              if ("F".equals(new String(checkFile))) {
+                System.out.println("File not found on the server.");
               } else {
+                // Save the file on the client side
+                Files.write(Paths.get(downloadPath), fileContent.array());
                 System.out.println(
-                  "Failed to download the file. File may not exist on the server."
+                  "File downloaded successfully to: " + downloadPath
                 );
               }
-
-              channel.close();
-              break;
             }
-          ///////////////////////////////////////////////////////////////////
-          case "R":
-            {
-              System.out.println("Please enter the current file name:");
-              keyboard = new Scanner(System.in);
-              String currentFileName = keyboard.nextLine();
+            break;
+          }
+        case "R":
+          {
+            System.out.println("Please enter the current file name: ");
+            String currentFileName = keyboard.nextLine();
+            System.out.println("Please enter the new file name: ");
+            String newFileName = keyboard.nextLine();
 
-              System.out.println("Please enter the new file name:");
-              String newFileName = keyboard.nextLine();
+            // Print statement added
+            System.out.println(
+              "Client: Renaming file '" +
+              currentFileName +
+              "' to '" +
+              newFileName +
+              "'..."
+            );
 
-              // Print statement added
-              System.out.println(
-                "Client: Renaming file '" +
-                currentFileName +
-                "' to '" +
-                newFileName +
-                "'..."
-              );
+            // Calculate the total size needed for the buffer
+            int totalSize =
+              Integer.BYTES + // Command length
+              command.length() +
+              Integer.BYTES + // Current file name length
+              currentFileName.length() +
+              Integer.BYTES + // New file name length
+              newFileName.length();
 
-              request = ByteBuffer.allocate(
-                Character.BYTES +
-                Integer.BYTES +
-                currentFileName.length() +
-                Integer.BYTES +
-                newFileName.length()
-              );
+            // Prepare the request buffer with command and file names
+            ByteBuffer renameRequest = ByteBuffer.allocate(totalSize);
 
-              request.putChar(command.charAt(0));
-              request.putInt(currentFileName.length());
-              request.put(currentFileName.getBytes());
-              request.putInt(newFileName.length());
-              request.put(newFileName.getBytes());
-              request.flip();
+            renameRequest.put(command.getBytes());
+            renameRequest.putInt(currentFileName.length());
+            renameRequest.put(currentFileName.getBytes());
+            renameRequest.putInt(newFileName.length());
+            renameRequest.put(newFileName.getBytes());
 
-              channel = SocketChannel.open();
+            // Flip the buffer before writing to the channel
+            renameRequest.flip();
+
+            try (SocketChannel channel = SocketChannel.open()) {
               channel.connect(new InetSocketAddress(args[0], serverPort));
-              channel.write(request);
+              channel.write(renameRequest);
               channel.shutdownOutput();
 
-              code = ByteBuffer.allocate(STATUS_CODE_LENGTH);
-              channel.read(code);
+              ByteBuffer renameCode = ByteBuffer.allocate(STATUS_CODE_LENGTH);
+              channel.read(renameCode);
               channel.close();
-              code.flip();
+              renameCode.flip();
 
               byte[] responseCode = new byte[STATUS_CODE_LENGTH];
-              code.get(responseCode);
+              renameCode.get(responseCode);
 
-              // Print the success or failure message
               if ("S".equals(new String(responseCode))) {
-                System.out.println("Client: File renamed successfully.");
+                System.out.println("S");
               } else {
-                System.out.println(
-                  "Client: Failed to rename the file. Check if the file exists and the new name is valid."
-                );
+                System.out.println("F");
               }
-
-              break;
             }
-          ///////////////////////////////////////////////////////////////////
-          case "L":
-            {
-              request = ByteBuffer.wrap(command.getBytes());
-              channel = SocketChannel.open();
+
+            break;
+          }
+        case "L":
+          {
+            ByteBuffer listRequest = ByteBuffer.wrap(command.getBytes());
+            try (SocketChannel channel = SocketChannel.open()) {
               channel.connect(new InetSocketAddress(args[0], serverPort));
-              channel.write(request);
+              channel.write(listRequest);
               channel.shutdownOutput();
 
-              ByteBuffer response = ByteBuffer.allocate(2500);
-              channel.read(response);
-              channel.close();
-              response.flip();
+              ByteBuffer fileListBuffer = ByteBuffer.allocate(2500); // Adjust the buffer size as needed
+              int numBytes;
+              do {
+                numBytes = channel.read(fileListBuffer);
+              } while (numBytes >= 0);
 
-              // Check the server's response
-              byte[] responseBytes = new byte[response.remaining()];
-              response.get(responseBytes);
-              String responseString = new String(
-                responseBytes,
+              fileListBuffer.flip();
+              byte[] fileListBytes = new byte[fileListBuffer.remaining()];
+              fileListBuffer.get(fileListBytes);
+
+              String fileList = new String(
+                fileListBytes,
                 StandardCharsets.UTF_8
               );
-
-              if ("S".equals(responseString)) {
-                System.out.println("Files available on the server:");
-                while (response.hasRemaining()) {
-                  byte[] fileNameBytes = new byte[response.get()];
-                  response.get(fileNameBytes);
-                  fileName = new String(fileNameBytes, StandardCharsets.UTF_8);
-                  System.out.println(fileName);
-                }
-              } else {
-                System.out.println(
-                  "Failed to retrieve the file list from the server."
-                );
-              }
-              break;
-              ///////////////////////////////////////////////////////////////////
+              System.out.println("File List:\n" + fileList);
             }
-          default:
-            if (!command.equals("Q")) {
-              System.out.println("Invalid command!");
-            }
-        }
-      } while (!command.equals("Q"));
-    } catch (IOException e) {
-      e.printStackTrace(); // Handle the exception as needed
-    }
+            break;
+          }
+        default:
+          if (!command.equals("Q")) {
+            System.out.println("Invalid command!");
+          }
+      }
+    } while (!command.equals("Q"));
+    keyboard.close(); // Close the scanner
   }
 }
+
