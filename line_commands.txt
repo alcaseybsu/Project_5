@@ -4,6 +4,7 @@ java -cp src file_service.FileServer
 
 
 
+Change IP + host when needed
 javac src/file_service/FileClient.java
 
 java -cp src file_service.FileClient localhost 3000
