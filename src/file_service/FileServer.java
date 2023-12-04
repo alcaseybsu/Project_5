@@ -13,7 +13,10 @@ import java.nio.file.Paths;
 public class FileServer {
 
   private static final String BASE_PATH =
-    System.getProperty("user.dir") + "\\TestFiles\\";
+          System.getProperty("user.dir") + "\\TestFiles\\";
+
+  private static final String UPLOAD_PATH =
+          System.getProperty("user.dir") + "\\caseUFiles\\";
 
   public static void main(String[] args) throws Exception {
     int port = 3000;
@@ -184,33 +187,38 @@ public class FileServer {
         case 'U':
           {
             // Extract file path
-            byte[] filePathBytes = new byte[request.getInt()];
-            request.get(filePathBytes);
-            String filePath = new String(filePathBytes, StandardCharsets.UTF_8);
+            byte[] u = new byte[request.remaining()];
+            request.get(u);
+            String fileToUpload = new String(u);
+            System.out.println("file to upload: " + fileToUpload);
 
-            // Read file content
-            byte[] fileContent = new byte[request.remaining()];
-            request.get(fileContent);
+            // Construct the absolute path to the file on the server
+            String filePath = UPLOAD_PATH + fileToUpload;
 
-            // Construct the absolute path to save the file on the server
-            String savePath = BASE_PATH + filePath;
+            File file = new File(filePath);
 
-            try {
-              Files.write(Paths.get(savePath), fileContent);
-
-              // Send success code to the client
-              ByteBuffer uploadCode = ByteBuffer.wrap("S".getBytes());
-              serveChannel.write(uploadCode);
-            } catch (IOException e) {
-              // Send failure code to the client
-              ByteBuffer uploadCode = ByteBuffer.wrap("F".getBytes());
-              serveChannel.write(uploadCode);
+            if (file.exists()) {
+              if (file.length() == 0) {
+                // File is empty, send an 'F' code
+                ByteBuffer uCode = ByteBuffer.wrap("F".getBytes());
+                serveChannel.write(uCode);
+              } else {
+                // Send the file content to the client
+                byte[] fileBytes = Files.readAllBytes(file.toPath());
+                ByteBuffer fileContent = ByteBuffer.wrap(fileBytes);
+                serveChannel.write(fileContent);
+              }
+            } else {
+              // Notify the client that the file is not found
+              ByteBuffer gCode = ByteBuffer.wrap("F".getBytes());
+              serveChannel.write(gCode);
             }
 
             serveChannel.close();
             break;
           }
+          }
       }
     }
   }
-}
+

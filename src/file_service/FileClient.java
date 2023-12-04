@@ -1,6 +1,5 @@
 package file_service;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -12,6 +11,9 @@ import java.util.Scanner;
 public class FileClient {
 
   private static final int STATUS_CODE_LENGTH = 1;
+
+
+
 
   public static void main(String[] args) throws Exception {
     Scanner keyboard = new Scanner(System.in);
@@ -46,59 +48,47 @@ public class FileClient {
             System.out.println(new String(d));
             break;
           }
-        case "U":
-          {
-            System.out.println(
-              "Please enter the file name to upload (located in 'caseUFiles' dir):"
+        case "U": {
+          System.out.println(
+                  "Please enter the file name to upload (located in 'caseUFiles' dir):"
+          );
+          String fileName = keyboard.nextLine();
+          String uploadPath = System.getProperty("user.dir") + "\\TestFiles\\";
+          String filePath = uploadPath + fileName;
+
+          ByteBuffer uploadRequest = ByteBuffer.wrap(
+                  (command + fileName).getBytes()
+          );
+          try (SocketChannel uploadChannel = SocketChannel.open()) {
+            uploadChannel.connect(
+                    new InetSocketAddress(args[0], serverPort)
             );
-            String fileName = keyboard.nextLine();
-            String filePath = "caseUFiles/" + fileName;
+            uploadChannel.write(uploadRequest);
+            uploadChannel.shutdownOutput();
 
-            try {
-              byte[] fileContent = Files.readAllBytes(Paths.get(filePath));
+            ByteBuffer fileContent = ByteBuffer.allocate(2500); // Adjust the buffer size as needed
+            int numBytes;
+            do {
+              numBytes = uploadChannel.read(fileContent);
+            } while (numBytes >= 0);
 
-              // Prepare the request buffer with command and file content
-              ByteBuffer uploadRequest = ByteBuffer.allocate(
-                Integer.BYTES +
-                command.length() +
-                Integer.BYTES +
-                filePath.length() +
-                fileContent.length
+            fileContent.flip();
+
+            // Check if the file exists on the server
+            byte[] checkFile = new byte[1];
+            fileContent.get(checkFile);
+            if ("F".equals(new String(checkFile))) {
+              System.out.println("File not found on the server.");
+            } else {
+              // Save the file on the client side
+              Files.write(Paths.get(filePath), fileContent.array());
+              System.out.println(
+                      "File uploaded successfully to: "
               );
-
-              uploadRequest.put(command.getBytes());
-              uploadRequest.putInt(filePath.length());
-              uploadRequest.put(filePath.getBytes());
-              uploadRequest.put(fileContent);
-
-              // Flip the buffer before writing to the channel
-              uploadRequest.flip();
-
-              try (SocketChannel channel = SocketChannel.open()) {
-                channel.connect(new InetSocketAddress(args[0], serverPort));
-                channel.write(uploadRequest);
-                channel.shutdownOutput();
-
-                ByteBuffer uploadCode = ByteBuffer.allocate(STATUS_CODE_LENGTH);
-                channel.read(uploadCode);
-                channel.close();
-                uploadCode.flip();
-
-                byte[] responseCode = new byte[STATUS_CODE_LENGTH];
-                uploadCode.get(responseCode);
-
-                if ("S".equals(new String(responseCode))) {
-                  System.out.println("S");
-                } else {
-                  System.out.println("F");
-                }
-              }
-            } catch (IOException e) {
-              System.out.println("Error reading the file: " + e.getMessage());
             }
-
             break;
           }
+        }
         // download a file
         case "G":
           {
