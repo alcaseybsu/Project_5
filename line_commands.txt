@@ -1,0 +1,14 @@
+
+FileServer:
+javac src/file_service/FileServer.java
+
+java -cp src file_service.FileServer
+
+
+FileClient:
+(change IP + host when needed)
+
+
+javac src/file_service/FileClient.java
+
+java -cp src file_service.FileClient localhost 3000
