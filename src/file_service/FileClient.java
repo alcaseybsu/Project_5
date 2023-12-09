@@ -51,17 +51,17 @@ public class FileClient {
             System.out.println(
               "Please enter the file name to upload (located in 'caseUFiles' dir):"
             );
-            String fileName = keyboard.nextLine();
-            String filePath = "caseUFiles/" + fileName;
+            String fileToUpload = keyboard.nextLine();
+            String filePath = "caseUFiles/" + fileToUpload;
 
             try {
               byte[] fileContent = Files.readAllBytes(Paths.get(filePath));
 
-              // Prepare the request buffer with command and file content
+              // prepare request buffer with command, filepath length, filepath, and file content
               ByteBuffer uploadRequest = ByteBuffer.allocate(
-                Integer.BYTES +
+                Integer.BYTES + // Command length
                 command.length() +
-                Integer.BYTES +
+                Integer.BYTES + // File path length
                 filePath.length() +
                 fileContent.length
               );
@@ -242,4 +242,3 @@ public class FileClient {
     keyboard.close(); // Close the scanner
   }
 }
-

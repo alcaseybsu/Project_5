@@ -179,21 +179,26 @@ public class FileServer {
             serveChannel.close();
             break;
           }
-        // Existing code...
-
         case 'U':
           {
-            // Extract file path
-            byte[] filePathBytes = new byte[request.getInt()];
-            request.get(filePathBytes);
-            String filePath = new String(filePathBytes, StandardCharsets.UTF_8);
+            // extract file path length
+            int filePathLength = request.getInt();
 
-            // Read file content
+            // extract file path
+            byte[] u = new byte[filePathLength];
+            request.get(u);
+            String filePath = new String(u, StandardCharsets.UTF_8);
+
+            System.out.println("Received file path: " + filePath);
+
+            // read file content
             byte[] fileContent = new byte[request.remaining()];
             request.get(fileContent);
 
-            // Construct the absolute path to save the file on the server
-            String savePath = BASE_PATH + filePath;
+            // construct absolute path to save file onto the server
+            String savePath = BASE_PATH + new File(filePath).getName(); // Use File.getName() to get just the file name
+
+            System.out.println("Save path: " + savePath);
 
             try {
               Files.write(Paths.get(savePath), fileContent);
@@ -202,7 +207,8 @@ public class FileServer {
               ByteBuffer uploadCode = ByteBuffer.wrap("S".getBytes());
               serveChannel.write(uploadCode);
             } catch (IOException e) {
-              // Send failure code to the client
+              e.printStackTrace();
+              // send failure code to the client
               ByteBuffer uploadCode = ByteBuffer.wrap("F".getBytes());
               serveChannel.write(uploadCode);
             }

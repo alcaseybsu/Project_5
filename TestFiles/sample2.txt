@@ -1,3 +1,0 @@
-Another sample text file for testing.
-It has different content than the first file.
-Use it to test download and upload functionality.
