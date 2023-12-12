@@ -1,3 +1,0 @@
-This is just a text file for making sure case U works. 
-If it works, a copy of this file should be uploaded into 
-Test Files.

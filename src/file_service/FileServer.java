@@ -26,7 +26,7 @@ public class FileServer {
   );
   private static final Map<String, ReentrantLock> fileLocks = new ConcurrentHashMap<>();
   private static final String BASE_PATH =
-    System.getProperty("user.dir") + File.separator + "TestFiles";
+    System.getProperty("user.dir");
   private static volatile boolean isShutdownRequested = false;
 
   public static void main(String[] args) throws Exception {
@@ -138,6 +138,7 @@ public class FileServer {
       }
     } finally {
       lock.unlock();
+      // Send response before closing the channel
       serveChannel.close();
     }
   }
@@ -270,4 +271,3 @@ public class FileServer {
     }
   }
 }
-
