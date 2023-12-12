@@ -33,6 +33,7 @@ public class FileServer {
     int port = 3000;
     ServerSocketChannel welcomeChannel = ServerSocketChannel.open();
     welcomeChannel.socket().bind(new InetSocketAddress(port));
+    System.out.println("Listening on port " + port);
 
     // start new thread that waits for shutdown command
     new Thread(() -> {
