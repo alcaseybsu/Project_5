@@ -25,8 +25,7 @@ public class FileServer {
     3
   );
   private static final Map<String, ReentrantLock> fileLocks = new ConcurrentHashMap<>();
-  private static final String BASE_PATH =
-    System.getProperty("user.dir");
+  private static final String BASE_PATH = System.getProperty("user.dir");
   private static volatile boolean isShutdownRequested = false;
 
   public static void main(String[] args) throws Exception {
@@ -269,5 +268,8 @@ public class FileServer {
         System.out.println("Unknown command: " + command);
         break;
     }
+
+    // Clear the buffer for the next read
+    request.clear();
   }
 }

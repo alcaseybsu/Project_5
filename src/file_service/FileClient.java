@@ -135,7 +135,7 @@ public class FileClient {
         case 'D':
         case 'R':
         case 'U':
-          byte deleteRenameUploadResult = (byte) response.get();
+          byte deleteRenameUploadResult = response.get();
           if (deleteRenameUploadResult == 'S') {
             System.out.println("Operation successful.");
           } else {
