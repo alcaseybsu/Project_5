@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class FileClient {
@@ -128,6 +129,8 @@ public class FileClient {
       clientChannel.read(response);
       response.flip();
 
+      String fileName = command.substring(2);
+
       switch (command.charAt(0)) {
         case 'D':
         case 'R':
@@ -142,9 +145,13 @@ public class FileClient {
         case 'G':
           byte[] fileContent = new byte[response.remaining()];
           response.get(fileContent);
-          System.out.println(
-            "File content: " + new String(fileContent, StandardCharsets.UTF_8)
-          );
+
+          // Write the file content to a file on the user's desktop
+          String desktopPath = System.getProperty("user.home") + File.separator + "Desktop";
+          Path filePath = Paths.get(desktopPath, fileName);
+          Files.write(filePath, fileContent);
+
+          System.out.println("File downloaded to desktop: " + fileName);
           break;
         case 'L':
           byte[] fileListBytes = new byte[response.remaining()];
