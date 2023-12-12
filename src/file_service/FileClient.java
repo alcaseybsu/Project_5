@@ -43,12 +43,14 @@ public class FileClient {
               }
             });
           } else if ("R".equals(command)) {
-            System.out.println("Please enter the name of the file to rename:");
-            String fileToRename = scanner.nextLine();
+            System.out.println(
+              "Please enter the current name of the file to rename:"
+            );
+            String currentFileName = scanner.nextLine();
             System.out.println("Please enter the new name for the file:");
             String newFileName = scanner.nextLine();
             final String renameCommand =
-              command + " " + fileToRename + " " + newFileName;
+              command + " " + currentFileName + " " + newFileName;
             executorService.submit(() -> {
               try {
                 handleCommand(renameCommand);

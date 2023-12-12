@@ -137,7 +137,6 @@ public class FileServer {
       }
     } finally {
       lock.unlock();
-      // Send response before closing the channel
       serveChannel.close();
     }
   }
