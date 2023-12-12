@@ -119,7 +119,9 @@ public class FileClient {
       clientChannel.write(request);
 
       ByteBuffer response = ByteBuffer.allocate(1024);
-      clientChannel.read(response);
+      while (clientChannel.read(response) > 0) {
+        // Keep reading until there's no more data
+      }
       response.flip();
 
       switch (command.charAt(0)) {
@@ -146,7 +148,8 @@ public class FileClient {
           System.out.println("File downloaded to desktop: " + fileName);
           break;
         case 'L':
-          byte[] fileListBytes = new byte[response.remaining()];
+          int fileListLength = response.getInt(); // Read the length of the file list
+          byte[] fileListBytes = new byte[fileListLength];
           response.get(fileListBytes);
           System.out.println(
             "File list: " + new String(fileListBytes, StandardCharsets.UTF_8)

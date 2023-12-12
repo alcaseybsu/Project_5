@@ -227,10 +227,14 @@ public class FileServer {
         fileList.append(fileInDirectory.getName()).append("\n");
       }
 
-      ByteBuffer fileListBuffer = ByteBuffer.wrap(
-        fileList.toString().getBytes()
-      );
-      serveChannel.write(fileListBuffer);
+      byte[] fileListBytes = fileList
+        .toString()
+        .getBytes(StandardCharsets.UTF_8);
+      ByteBuffer response = ByteBuffer.allocate(1024);
+      response.putInt(fileListBytes.length); // Send the length of the file list
+      response.put(fileListBytes); // Send the file list
+      response.flip();
+      serveChannel.write(response);
     } else {
       ByteBuffer listCode = ByteBuffer.wrap("F".getBytes());
       serveChannel.write(listCode);
