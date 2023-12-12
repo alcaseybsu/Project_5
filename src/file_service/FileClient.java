@@ -1,17 +1,17 @@
 package file_service;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.Scanner;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class FileClient {
 
@@ -43,12 +43,14 @@ public class FileClient {
               }
             });
           } else if ("R".equals(command)) {
-            System.out.println("Please enter the name of the file to rename:");
-            String fileToRename = scanner.nextLine();
+            System.out.println(
+              "Please enter the current name of the file to rename:"
+            );
+            String currentFileName = scanner.nextLine();
             System.out.println("Please enter the new name for the file:");
             String newFileName = scanner.nextLine();
             final String renameCommand =
-              command + " " + fileToRename + " " + newFileName;
+              command + " " + currentFileName + " " + newFileName;
             executorService.submit(() -> {
               try {
                 handleCommand(renameCommand);
@@ -94,32 +96,23 @@ public class FileClient {
       ByteBuffer request = ByteBuffer.allocate(1024);
       request.put((byte) command.charAt(0));
 
-      switch (command.charAt(0)) {
-        case 'D':
-        case 'R':
-        case 'G':
-        case 'U':
-          String fileName = command.substring(2);
-          request.putInt(fileName.length());
-          request.put(fileName.getBytes(StandardCharsets.UTF_8));
+      String[] commandParts = command.split(" ");
+      String fileName = commandParts[1];
+      request.putInt(fileName.length());
+      request.put(fileName.getBytes(StandardCharsets.UTF_8));
 
-          // If the command is 'U', read the file from the user's desktop
-          if (command.charAt(0) == 'U') {
-            String desktopPath =
-              System.getProperty("user.home") + File.separator + "Desktop";
-            byte[] fileContent = Files.readAllBytes(
-              Paths.get(desktopPath, fileName)
-            );
-            request.putInt(fileContent.length);
-            request.put(fileContent);
-          }
-          break;
-        case 'L':
-          // No additional data needed for 'L' command
-          break;
-        default:
-          System.out.println("Unknown command: " + command.charAt(0));
-          return;
+      if (command.charAt(0) == 'R') {
+        String newFileName = commandParts[2];
+        request.putInt(newFileName.length());
+        request.put(newFileName.getBytes(StandardCharsets.UTF_8));
+      } else if (command.charAt(0) == 'U') {
+        String desktopPath =
+          System.getProperty("user.home") + File.separator + "Desktop";
+        byte[] fileContent = Files.readAllBytes(
+          Paths.get(desktopPath, fileName)
+        );
+        request.putInt(fileContent.length);
+        request.put(fileContent);
       }
 
       request.flip();
@@ -128,8 +121,6 @@ public class FileClient {
       ByteBuffer response = ByteBuffer.allocate(1024);
       clientChannel.read(response);
       response.flip();
-
-      String fileName = command.substring(2);
 
       switch (command.charAt(0)) {
         case 'D':
@@ -147,7 +138,8 @@ public class FileClient {
           response.get(fileContent);
 
           // Write the file content to a file on the user's desktop
-          String desktopPath = System.getProperty("user.home") + File.separator + "Desktop";
+          String desktopPath =
+            System.getProperty("user.home") + File.separator + "Desktop";
           Path filePath = Paths.get(desktopPath, fileName);
           Files.write(filePath, fileContent);
 
