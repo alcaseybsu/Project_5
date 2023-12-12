@@ -26,7 +26,7 @@ public class FileServer {
   );
   private static final Map<String, ReentrantLock> fileLocks = new ConcurrentHashMap<>();
   private static final String BASE_PATH =
-    System.getProperty("user.dir") + File.separator + "TestFiles";
+    System.getProperty("user.dir");
   private static volatile boolean isShutdownRequested = false;
 
   public static void main(String[] args) throws Exception {
@@ -114,11 +114,17 @@ public class FileServer {
     byte[] oldNameBytes = new byte[oldNameLength];
     request.get(oldNameBytes);
     String oldName = new String(oldNameBytes, StandardCharsets.UTF_8);
+    System.out.println(oldName);
+    System.out.println(oldName);
 
     int newNameLength = request.getInt();
+    System.out.println(oldName);
     byte[] newNameBytes = new byte[newNameLength];
+    System.out.println(oldName);
     request.get(newNameBytes);
+    System.out.println(oldName);
     String newName = new String(newNameBytes, StandardCharsets.UTF_8);
+
 
     String oldFilePath = BASE_PATH + File.separator + oldName;
     String newFilePath = BASE_PATH + File.separator + newName;
@@ -152,6 +158,7 @@ public class FileServer {
     String fileName = new String(g, StandardCharsets.UTF_8);
 
     String filePath = BASE_PATH + File.separator + fileName;
+    System.out.println(filePath);
 
     ReentrantLock lock = fileLocks.computeIfAbsent(
       filePath,
