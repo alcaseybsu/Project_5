@@ -18,8 +18,11 @@ public class FileClient {
   private static final ExecutorService executorService = Executors.newFixedThreadPool(
     3
   );
-  private static final String SERVER_HOST = "localhost";
-  private static final int SERVER_PORT = 3000;
+
+  private static final String SERVER_HOST = System.getenv("SERVER_HOST");
+  private static final int SERVER_PORT = Integer.parseInt(
+    System.getenv("SERVER_PORT")
+  );
 
   public static void main(String[] args) throws Exception {
     // start new thread that waits for user commands
@@ -27,7 +30,7 @@ public class FileClient {
       try (Scanner scanner = new Scanner(System.in)) {
         while (true) {
           System.out.println("Please enter a command (Q to quit):");
-          String command = scanner.nextLine();
+          String command = scanner.nextLine().toUpperCase();
           if ("Q".equals(command)) {
             executorService.shutdown();
             System.exit(0);
@@ -93,7 +96,11 @@ public class FileClient {
         new InetSocketAddress(SERVER_HOST, SERVER_PORT)
       )
     ) {
-      ByteBuffer request = ByteBuffer.allocate(1024);
+      byte[] fileContent = new byte[0];
+
+      ByteBuffer request = ByteBuffer.allocate(2500 + fileContent.length);
+      request.putInt(fileContent.length);
+      request.put(fileContent);
       request.put((byte) command.charAt(0));
 
       String[] commandParts = command.split(" ");
@@ -108,9 +115,12 @@ public class FileClient {
       } else if (command.charAt(0) == 'U') {
         String desktopPath =
           System.getProperty("user.home") + File.separator + "Desktop";
-        byte[] fileContent = Files.readAllBytes(
-          Paths.get(desktopPath, fileName)
-        );
+        Path filePath = Paths.get(desktopPath, fileName);
+        if (!Files.exists(filePath)) {
+          System.out.println("File does not exist on the desktop.");
+          return;
+        }
+        fileContent = Files.readAllBytes(filePath);
         request.putInt(fileContent.length);
         request.put(fileContent);
       }
@@ -118,7 +128,7 @@ public class FileClient {
       request.flip();
       clientChannel.write(request);
 
-      ByteBuffer response = ByteBuffer.allocate(1024);
+      ByteBuffer response = ByteBuffer.allocate(2500);
       while (clientChannel.read(response) > 0) {
         // Keep reading until there's no more data
       }
@@ -136,27 +146,34 @@ public class FileClient {
           }
           break;
         case 'G':
-          byte[] fileContent = new byte[response.remaining()];
-          response.get(fileContent);
+          char downloadResult = (char) response.get();
+          if (downloadResult == 'S') {
+            fileContent = new byte[response.remaining()];
+            response.get(fileContent);
 
-          // Write the file content to a file on the user's desktop
-          String desktopPath =
-            System.getProperty("user.home") + File.separator + "Desktop";
-          Path filePath = Paths.get(desktopPath, fileName);
-          Files.write(filePath, fileContent);
+            // Write the file content to a file on the user's desktop
+            String desktopPath =
+              System.getProperty("user.home") + File.separator + "Desktop";
+            Path filePath = Paths.get(desktopPath, fileName);
+            Files.write(filePath, fileContent);
 
-          System.out.println("File downloaded to desktop: " + fileName);
+            System.out.println("File downloaded to desktop: " + fileName);
+          } else {
+            System.out.println("File download failed.");
+          }
           break;
         case 'L':
-          int fileListLength = response.getInt(); // Read the length of the file list
-          byte[] fileListBytes = new byte[fileListLength];
-          response.get(fileListBytes);
-          System.out.println(
-            "File list: " + new String(fileListBytes, StandardCharsets.UTF_8)
-          );
-          break;
-        default:
-          System.out.println("Unknown command: " + command.charAt(0));
+          char listResult = (char) response.get();
+          if (listResult == 'S') {
+            int fileListLength = response.getInt(); // Read the length of the file list
+            byte[] fileListBytes = new byte[fileListLength];
+            response.get(fileListBytes);
+            System.out.println(
+              "File list: " + new String(fileListBytes, StandardCharsets.UTF_8)
+            );
+          } else {
+            System.out.println("File list retrieval failed.");
+          }
           break;
       }
     }

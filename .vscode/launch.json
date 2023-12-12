@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Launch FileClient",
+            "request": "launch",
+            "mainClass": "file_service.FileClient",
+            "env": {
+                "SERVER_HOST": "10.222.84.31",
+                "SERVER_PORT": "3000"
+            }
+        }
+    ]
+}

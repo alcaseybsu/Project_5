@@ -33,6 +33,7 @@ public class FileServer {
     int port = 3000;
     ServerSocketChannel welcomeChannel = ServerSocketChannel.open();
     welcomeChannel.socket().bind(new InetSocketAddress(port));
+    System.out.println("Listening on port " + port);
 
     // start new thread that waits for shutdown command
     new Thread(() -> {
@@ -219,37 +220,48 @@ public class FileServer {
   private static void handleList(SocketChannel serveChannel)
     throws IOException {
     File directory = new File(BASE_PATH);
-    File[] files = directory.listFiles();
+    try {
+        StringBuilder fileList = new StringBuilder();
 
-    if (files != null) {
-      StringBuilder fileList = new StringBuilder();
-      for (File fileInDirectory : files) {
-        fileList.append(fileInDirectory.getName()).append("\n");
-      }
+        System.out.println("Listing files in directory: " + BASE_PATH);
+        File[] files = directory.listFiles();
 
-      byte[] fileListBytes = fileList
-        .toString()
-        .getBytes(StandardCharsets.UTF_8);
-      ByteBuffer response = ByteBuffer.allocate(1024);
-      response.putInt(fileListBytes.length); // Send the length of the file list
-      response.put(fileListBytes); // Send the file list
-      response.flip();
-      serveChannel.write(response);
-    } else {
-      ByteBuffer listCode = ByteBuffer.wrap("F".getBytes());
-      serveChannel.write(listCode);
+        if (files != null) {
+            System.out.println("Files in directory: ");
+            for (File fileInDirectory : files) {
+                fileList.append(fileInDirectory.getName()).append("\n");
+            }
+
+            byte[] fileListBytes = fileList
+                .toString()
+                .getBytes(StandardCharsets.UTF_8);
+            ByteBuffer response = ByteBuffer.allocate(2500);
+            response.putInt(fileListBytes.length); // Send length of file list
+            response.put(fileListBytes); // Send file list
+            response.flip();
+            serveChannel.write(response);
+        } else {
+            System.out.println("No files found or directory doesn't exist.");
+            ByteBuffer listCode = ByteBuffer.wrap("F".getBytes());
+            serveChannel.write(listCode);
+        }
+    } finally {
+        if (serveChannel != null) {
+            serveChannel.close();
+        }    
     }
-
-    serveChannel.close();
-  }
-
+}
   private static void handleClientRequest(SocketChannel serveChannel)
     throws IOException {
-    ByteBuffer request = ByteBuffer.allocate(1024);
-    serveChannel.read(request);
+    ByteBuffer request = ByteBuffer.allocate(2500);
+    int bytesRead = serveChannel.read(request);
     request.flip();
 
-    char command = (char) request.get();
+    System.out.println("Bytes read: " + bytesRead);
+    byte commandByte = request.get();
+    System.out.println("Command byte: " + commandByte);
+    char command = (char) commandByte;
+    System.out.println("Received command: " + command);
 
     switch (command) {
       case 'D':
